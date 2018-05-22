@@ -16,13 +16,19 @@ public class NodeBrain : MonoBehaviour
     [SerializeField]
     float rotSpeed = 10;
 
-    float tempNodeDistanceThreshold;
+    [SerializeField]
+    float giveUpTime;
+    float giveUpTimeReset = 6;
+    Node previousNode;
+
+
     float currentSpeed;
     Vector3 prevPos;
 
     private void Start()
     {
-        tempNodeDistanceThreshold = nodeDistanceThreshold;
+        if (currentNode)
+            previousNode = currentNode;
     }
 
     // Update is called once per frame
@@ -31,26 +37,32 @@ public class NodeBrain : MonoBehaviour
         if (currentNode == null || currentNode.Connections == null || currentNode.Connections.Length == 0)
             return;
 
-        if (DistanceToNode() < tempNodeDistanceThreshold)
+        GiveUpOnPath();
+        if (DistanceToNode() < nodeDistanceThreshold)
             GetNewTargetNode();
-
-
         MoveTowardsNode(currentNode.transform.position);
         CalcCurrentSpeed();
-        tempNodeDistanceThreshold += Time.deltaTime;
 
+    }
+
+    private void GiveUpOnPath()
+    {
+        giveUpTime -= Time.deltaTime;
+        if (giveUpTime < 0)
+        {
+            currentNode = previousNode;
+            giveUpTime = giveUpTimeReset;
+        }
     }
 
     private void CalcCurrentSpeed()
     {
         currentSpeed = Vector3.Distance(body.transform.position, prevPos);
         prevPos = body.transform.position;
-        print(currentSpeed * speed);
     }
 
     private void MoveTowardsNode(Vector3 point)
     {
-
         if (RotateTowards(new Vector3(point.x, 0, point.z)))
             body.velocity = transform.forward.normalized * speed;
     }
@@ -60,9 +72,10 @@ public class NodeBrain : MonoBehaviour
         Vector3 pointB = new Vector3(body.transform.position.x, 0, body.transform.position.z);
 
         Quaternion targetRot = Quaternion.LookRotation((point - pointB).normalized);
-        body.MoveRotation(Quaternion.Lerp(body.rotation, targetRot, .5f));
+        body.MoveRotation(Quaternion.Lerp(body.rotation, targetRot, rotSpeed));
+        return true;
 
-        if (Mathf.Abs(body.rotation.eulerAngles.y - targetRot.eulerAngles.y) < 10)
+        if (Quaternion.Angle(body.rotation, targetRot) < 15)
         {
             return true;
         }
@@ -76,7 +89,8 @@ public class NodeBrain : MonoBehaviour
 
     private void GetNewTargetNode()
     {
+        previousNode = currentNode;
         currentNode = currentNode.Connections[UnityEngine.Random.Range(0, currentNode.Connections.Length)];
-        tempNodeDistanceThreshold = nodeDistanceThreshold;
+        giveUpTime = giveUpTimeReset;
     }
 }
